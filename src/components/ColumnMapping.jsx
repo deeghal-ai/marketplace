@@ -112,8 +112,9 @@ const ColumnMapping = ({ columns, mapping, rawData, onMappingChange, onConfirm, 
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
-        {columns.map(col => {
+      {/* Helper to render a single column mapping row */}
+      {(() => {
+        const renderColumnRow = (col) => {
           const currentMapping = mapping[col];
           const suggestion = columnAnalysis[col];
           const preview = currentMapping && isCombinedField(currentMapping)
@@ -215,8 +216,48 @@ const ColumnMapping = ({ columns, mapping, rawData, onMappingChange, onConfirm, 
               )}
             </div>
           );
-        })}
-      </div>
+        };
+
+        // Separate columns into mandatory-mapped and other
+        const mandatoryFieldKeys = ['vin', 'make', 'model', 'year', 'color', 'combined_make_model', 'combined_make_model_variant', 'combined_full_description'];
+
+        const mandatoryMappedColumns = columns.filter(col => {
+          const mappedTo = mapping[col];
+          return mappedTo && mandatoryFieldKeys.includes(mappedTo);
+        });
+
+        const otherColumns = columns.filter(col => !mandatoryMappedColumns.includes(col));
+
+        return (
+          <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6">
+            {/* Mandatory Fields Section */}
+            {mandatoryMappedColumns.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                  <h3 className="text-sm font-semibold text-gray-700">Required Fields</h3>
+                  <span className="text-xs text-gray-500">({mandatoryMappedColumns.length} mapped)</span>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-3 bg-red-50/50 rounded-lg border border-red-100">
+                  {mandatoryMappedColumns.map(col => renderColumnRow(col))}
+                </div>
+              </div>
+            )}
+
+            {/* Other Fields Section */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                <h3 className="text-sm font-semibold text-gray-700">Optional Fields</h3>
+                <span className="text-xs text-gray-500">({otherColumns.length} columns)</span>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {otherColumns.map(col => renderColumnRow(col))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="mt-4 pt-4 border-t border-gray-200">
         <div className="flex items-center gap-6 text-xs text-gray-500">
