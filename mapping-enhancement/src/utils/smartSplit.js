@@ -22,15 +22,14 @@ export const KNOWN_MAKES = [
   // Chinese
   'BYD', 'Geely', 'Great Wall', 'Haval', 'Chery', 'SAIC', 'NIO', 'XPeng', 'Li Auto', 'Dongfeng', 'FAW',
   'Changan', 'GAC', 'BAIC', 'JAC', 'Zotye', 'Foton', 'Wuling', 'Baojun', 'Roewe', 'MG', 'Lynk & Co',
-  // Additional Chinese brands
-  'Trumpchi', 'GAC Trumpchi', 'Roewe', 'Maxus', 'SAIC Maxus', 'Hongqi', 'Arcfox', 'Zeekr', 'Leapmotor',
+  'Trumpchi', 'GAC Trumpchi', 'Maxus', 'SAIC Maxus', 'Hongqi', 'Arcfox', 'Zeekr', 'Leapmotor',
   'IM Motors', 'Rising Auto', 'Voyah', 'Denza', 'Yangwang', 'Fangchengbao', 'Jiyue',
-  // Japanese
+  // Japanese additional
   'Daihatsu', 'Isuzu',
-  // Additional models that might appear as makes in combined fields (removed to avoid confusion)
-  // 'Crider', 'Sylphy', 'Levin', 'Lavida', 'Passat', 'Sagitar', 'Teana', 'Tiguan',
   // Other
   'Tata', 'Mahindra', 'Proton', 'Perodua',
+  // Models that might appear as makes in combined fields (for Chinese JV vehicles)
+  'Crider', 'Sylphy', 'Levin', 'Lavida', 'Passat', 'Sagitar', 'Teana', 'Tiguan',
 ];
 
 // Normalize make names (handle variations)
@@ -39,10 +38,18 @@ const MAKE_ALIASES = {
   'Chevy': 'Chevrolet',
   'Mercedes-Benz': 'Mercedes',
   'Range Rover': 'Land Rover',
+  'GAC Trumpchi': 'Trumpchi',
+  'SAIC Maxus': 'Maxus',
 };
 
 // Helper function to escape special regex characters
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+
+// Chinese joint venture parent company names
+const PARENT_COMPANIES = [
+  'GAC', 'SAIC', 'FAW', 'Dongfeng', 'BAIC', 'Changan', 'Brilliance', 'Beijing',
+  'Guangzhou', 'Shanghai', 'Geely', 'Great Wall', 'Chery', 'BYD',
+];
 
 /**
  * Extract year from various formats (2021, 2021年, "2021 Model", etc.)
@@ -101,12 +108,6 @@ export const detectCombinedMakeModel = (sampleValues) => {
   };
 };
 
-// Chinese joint venture parent company names
-const PARENT_COMPANIES = [
-  'GAC', 'SAIC', 'FAW', 'Dongfeng', 'BAIC', 'Changan', 'Brilliance', 'Beijing',
-  'Guangzhou', 'Shanghai', 'Geely', 'Great Wall', 'Chery', 'BYD',
-];
-
 /**
  * Split a combined Make+Model value into separate parts
  * @param {string} value - The combined value like "Volkswagen Tiguan L 2017 330TSI"
@@ -132,100 +133,75 @@ export const splitMakeModel = (value) => {
       make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
       if (make === 'Vw') make = 'Volkswagen';
       if (make === 'Bmw') make = 'BMW';
+      if (make === 'Gac') make = 'GAC';
+      if (make === 'Byd') make = 'BYD';
       remainder = trimmed.slice(match[0].length).trim();
       break;
     }
   }
 
-  // If no make found at start, check for PARENT COMPANY + MAKE pattern
+  // If no make found at start, check for INVERTED pattern (parent company first)
   if (!make) {
-    const words = trimmed.split(/\s+/);
-    
-    // Check for pattern like "2019 GAC Honda Crider..." 
-    // where we have [year] [parent_company] [actual_make] [model]
-    for (let i = 0; i < Math.min(words.length - 1, 3); i++) {
-      const currentWord = words[i];
-      const nextWord = words[i + 1];
-      
-      // Skip if current word is a year
-      if (/^\d{4}년?$/.test(currentWord)) continue;
-      
-      // Check if current word is a parent company and next word is a known make
-      const isParentCompany = PARENT_COMPANIES.some(p =>
-        currentWord.toLowerCase() === p.toLowerCase()
-      );
-      
-      if (isParentCompany) {
-        // Check if the next word is a known make
-        for (const knownMake of sortedMakes) {
-          if (nextWord.toLowerCase() === knownMake.toLowerCase()) {
-            make = MAKE_ALIASES[nextWord] || nextWord;
-            make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
-            if (make === 'Vw') make = 'Volkswagen';
-            if (make === 'Bmw') make = 'BMW';
-            
-            // Remainder starts after both parent company and make
-            const afterMake = words.slice(i + 2).join(' ');
-            remainder = afterMake;
-            break;
-          }
+    const firstWord = trimmed.split(/\s+/)[0];
+    const isParentCompany = PARENT_COMPANIES.some(p =>
+      firstWord.toLowerCase() === p.toLowerCase()
+    );
+
+    if (isParentCompany) {
+      const afterParent = trimmed.slice(firstWord.length).trim();
+
+      for (const knownMake of sortedMakes) {
+        const regex = new RegExp(`^${escapeRegex(knownMake)}\\b`, 'i');
+        const match = afterParent.match(regex);
+        if (match) {
+          make = MAKE_ALIASES[match[0]] || match[0];
+          make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
+          if (make === 'Vw') make = 'Volkswagen';
+          if (make === 'Bmw') make = 'BMW';
+          if (make === 'Gac') make = 'GAC';
+          if (make === 'Byd') make = 'BYD';
+          remainder = afterParent.slice(match[0].length).trim();
+          break;
         }
-        if (make) break;
       }
     }
 
-    // Final fallback: look for any known make in the string
-    // But prioritize longer matches and avoid parent companies
+    // Still no make? Try to find it anywhere in the string
     if (!make) {
-      let bestMatch = null;
-      let bestMatchLength = 0;
-      
       for (const knownMake of sortedMakes) {
         const regex = new RegExp(`\\b${escapeRegex(knownMake)}\\b`, 'i');
         const match = trimmed.match(regex);
         if (match) {
-          // Skip if this appears to be after a parent company
-          const beforeMatch = trimmed.slice(0, match.index).trim();
-          const wordsBeforeMatch = beforeMatch.split(/\s+/);
-          const lastWordBefore = wordsBeforeMatch[wordsBeforeMatch.length - 1];
-          
-          const isAfterParentCompany = PARENT_COMPANIES.some(p =>
-            lastWordBefore && lastWordBefore.toLowerCase() === p.toLowerCase()
-          );
-          
-          if (!isAfterParentCompany && knownMake.length > bestMatchLength) {
-            bestMatch = {
-              make: knownMake,
-              match: match
-            };
-            bestMatchLength = knownMake.length;
-          }
+          make = MAKE_ALIASES[match[0]] || match[0];
+          make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
+          if (make === 'Vw') make = 'Volkswagen';
+          if (make === 'Bmw') make = 'BMW';
+          if (make === 'Gac') make = 'GAC';
+          if (make === 'Byd') make = 'BYD';
+          const afterMake = trimmed.slice(match.index + match[0].length).trim();
+          remainder = afterMake;
+          break;
         }
-      }
-      
-      if (bestMatch) {
-        make = MAKE_ALIASES[bestMatch.make] || bestMatch.make;
-        make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
-        if (make === 'Vw') make = 'Volkswagen';
-        if (make === 'Bmw') make = 'BMW';
-        const afterMake = trimmed.slice(bestMatch.match.index + bestMatch.match[0].length).trim();
-        remainder = afterMake;
       }
     }
   }
 
-  // Extract year using enhanced function from original string AND remainder
+  // Extract year using enhanced function - handle various formats including "2021年"
   let year = '';
-  const extractedYearFromOriginal = extractYear(trimmed);
-  const extractedYearFromRemainder = extractYear(remainder);
-  
-  if (extractedYearFromOriginal) {
-    year = extractedYearFromOriginal;
-    // Remove year from remainder if present
-    remainder = remainder.replace(/\b(199\d|20[0-3]\d)년?\b/g, '').trim();
-  } else if (extractedYearFromRemainder) {
-    year = extractedYearFromRemainder;
-    remainder = remainder.replace(/\b(199\d|20[0-3]\d)년?\b/g, '').trim();
+  const extractedYear = extractYear(remainder);
+  if (extractedYear) {
+    year = extractedYear;
+    // Remove year and any trailing Chinese characters from remainder
+    remainder = remainder.replace(/\b(199\d|20[0-3]\d)年?\b/g, '').trim();
+  }
+
+  // Also check for year with decimal (legacy format)
+  if (!year) {
+    const yearDecimalMatch = remainder.match(/\b(199\d|20[0-3]\d)\.\d+/);
+    if (yearDecimalMatch) {
+      year = yearDecimalMatch[0].split('.')[0];
+      remainder = remainder.replace(yearDecimalMatch[0], '').trim();
+    }
   }
 
   const parts = remainder.split(/\s+/).filter(p => p);
@@ -288,30 +264,21 @@ export const getSampleValues = (rawData, columnName, sampleSize = 10) => {
  */
 export const analyzeColumnForSmartSplit = (sampleValues) => {
   if (!sampleValues || sampleValues.length === 0) {
-    return { shouldSplit: false, confidence: 0, detectedMakes: [], previews: [], hasVariant: false, hasYear: false, dataType: 'unknown' };
+    return { shouldSplit: false, confidence: 0, detectedMakes: [], previews: [] };
   }
   
   const validSamples = sampleValues.filter(v => v && typeof v === 'string' && v.trim().length > 0);
   if (validSamples.length === 0) {
-    return { shouldSplit: false, confidence: 0, detectedMakes: [], previews: [], hasVariant: false, hasYear: false, dataType: 'unknown' };
+    return { shouldSplit: false, confidence: 0, detectedMakes: [], previews: [] };
   }
   
   const detectedMakes = new Set();
   let makeMatchCount = 0;
   let yearMatchCount = 0;
   let multiWordCount = 0;
-  let variantCount = 0;
   const previews = [];
   
-  // Patterns that indicate variant/trim information
-  const variantPatterns = [
-    /cvt/i, /turbo/i, /tsi/i, /tdi/i, /tfsi/i, /hybrid/i,
-    /comfort/i, /luxury/i, /sport/i, /classic/i, /elite/i, /premium/i,
-    /\d+T\b/, /\d+L\b/, /\d+V\b/, /180\s*Turbo/, /\d{3}TSI/,
-    /key\s*account/i, /专享版/i, /舒适版/i, /豪华版/i,
-  ];
-  
-  validSamples.slice(0, 10).forEach(value => {
+  validSamples.slice(0, 5).forEach(value => {
     const normalized = value.trim();
     
     // Check for known makes
@@ -330,77 +297,33 @@ export const analyzeColumnForSmartSplit = (sampleValues) => {
     }
     
     // Check for multi-word (likely combined)
-    const wordCount = normalized.split(/\s+/).length;
-    if (wordCount >= 2) {
+    if (normalized.split(/\s+/).length >= 2) {
       multiWordCount++;
-    }
-    
-    // Check for variant patterns
-    const hasVariantPattern = variantPatterns.some(pattern => pattern.test(normalized));
-    // Also consider having 3+ words as potential variant (more complex than just Make+Model)
-    if (hasVariantPattern || wordCount >= 3) {
-      variantCount++;
     }
     
     // Generate preview
     const split = splitMakeModel(normalized);
     if (split.make || split.model) {
       previews.push({
-        original: normalized.length > 60 ? normalized.substring(0, 60) + '...' : normalized,
+        original: normalized.length > 50 ? normalized.substring(0, 50) + '...' : normalized,
         ...split
       });
     }
   });
   
-  // Calculate metrics
+  // Calculate confidence
   const makeConfidence = makeMatchCount / validSamples.length;
   const yearConfidence = yearMatchCount / validSamples.length;
   const multiWordConfidence = multiWordCount / validSamples.length;
-  const variantConfidence = variantCount / validSamples.length;
-  const avgWordCount = validSamples.reduce((sum, v) => sum + v.trim().split(/\s+/).length, 0) / validSamples.length;
   
-  // Determine data type based on word count and content
-  let dataType = 'unknown';
-  
-  // Single word columns (like "HONDA", "NISSAN") are just make columns - NOT splittable
-  if (avgWordCount < 1.5) {
-    dataType = 'single_value'; // Just make or model, not combined
-  } else if (avgWordCount >= 1.5 && avgWordCount <= 2.5 && makeConfidence > 0.3 && multiWordConfidence > 0.5) {
-    dataType = 'clean_make_model'; // "HONDA Crider" format - 2 words
-  } else if (avgWordCount > 3 && (variantConfidence > 0.3 || yearConfidence > 0.3)) {
-    dataType = 'full_description'; // "2019 GAC Honda Crider 180Turbo CVT Comfort"
-  } else if (avgWordCount > 2 && makeConfidence > 0.3) {
-    dataType = 'combined_make_model';
-  }
-  
-  // Only suggest split if column actually has multiple words (combined data)
-  // Single-word columns with car makes are just "make" columns, not combined
-  const isSplittable = multiWordConfidence > 0.5 && makeMatchCount > 0 && avgWordCount >= 1.5;
-  const confidence = isSplittable 
-    ? Math.round((makeConfidence * 0.4 + multiWordConfidence * 0.4 + yearConfidence * 0.2) * 100)
-    : 0;
+  // Combined confidence score
+  const confidence = (makeConfidence * 0.5) + (multiWordConfidence * 0.3) + (yearConfidence * 0.2);
   
   return {
-    shouldSplit: isSplittable,
-    confidence,
+    shouldSplit: confidence > 0.3 && makeMatchCount > 0,
+    confidence: Math.round(confidence * 100),
     detectedMakes: Array.from(detectedMakes),
     hasYearInValues: yearMatchCount > 0,
-    hasVariant: variantConfidence > 0.3 && avgWordCount > 2,
-    variantConfidence: Math.round(variantConfidence * 100),
-    previews: previews.slice(0, 3),
-    dataType,
-    avgWordCount: Math.round(avgWordCount * 10) / 10,
+    previews: previews.slice(0, 3)
   };
-};
-
-/**
- * Extract variant information from a complex model description
- * @param {string} value - The full description like "2019 GAC Honda Crider 180Turbo CVT Comfort China VI"
- * @returns {string} - Extracted variant string
- */
-export const extractVariantFromDescription = (value) => {
-  if (!value || typeof value !== 'string') return '';
-  
-  const result = splitMakeModel(value);
-  return result.variant || '';
 };

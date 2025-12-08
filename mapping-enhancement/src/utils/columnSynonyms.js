@@ -5,7 +5,7 @@ export const COLUMN_SYNONYMS = {
   make: ['make', 'brand', 'manufacturer', 'oem', 'car make', 'vehicle make'],
   model: ['model', 'model name', 'car model', 'vehicle model'],
   year: ['year', 'model year', 'manufacturing year', 'mfg year', 'yr', 'production year', 'year of production'],
-  color: ['color', 'colour', 'exterior color', 'body color', 'ext color', 'paint color', 'ext.color', 'ext color', 'exterior colour', 'ext.colour', '颜色', 'ext. color'],
+  color: ['color', 'colour', 'exterior color', 'body color', 'ext color', 'paint color', 'ext.color', 'exterior colour'],
 
   // Listing fields - ORDER MATTERS for priority (more specific first)
   drivetrain: ['drivetrain', 'drive type', 'wheel drive', 'driven wheels', '4wd', '2wd', 'awd', 'fwd', 'rwd'],
@@ -19,40 +19,29 @@ export const COLUMN_SYNONYMS = {
   seatingCapacity: ['seating capacity', 'seats', 'seating', 'passengers', 'no of seats', 'seat count'],
   doors: ['doors', 'number of doors', 'no of doors', 'door count'],
   condition: ['condition', 'vehicle condition', 'state', 'car condition', 'test level', 'level', 'grade', 'rating'],
-  regionalSpecs: ['regional specs', 'specs', 'specification', 'region', 'market', 'emission standard'],
+  regionalSpecs: ['regional specs', 'specs', 'specification', 'region', 'market', 'emission standard', 'brand type'],
   city: ['city', 'location', 'dealer city'],
   country: ['country', 'nation', 'dealer country'],
   description: ['description', 'details', 'about', 'notes', 'remarks', 'comments', 'vehicle condition description', 'material name'],
 
-  // Serial/Index columns to skip
-  _skip: ['no', 'sr. no', 'sr no', 'sr.no', 'serial', 'serial number', 'serial no', 'row', '#', 'id', 'index', 'sno', 's.no'],
-  
-  // Enhanced mappings
-  inspectionReport: ['test report', 'inspection report', 'inspection', 'report', 'report url', 'inspection url', 'inspection link'],
-
   // Vehicle-specific fields
   vin: ['vin', 'vehicle identification number', 'chassis number', 'chassis', 'vin number', 'chassis no', 'vehicle chassis number'],
   registrationNumber: ['registration number', 'reg number', 'registration', 'plate number', 'license plate', 'number plate', 'reg no', 'plate', '1st registration', '1st registration date', 'first registration', 'first registration date', 'registration date'],
-  mileage: ['mileage', 'kms driven', 'kilometers', 'odometer', 'odometer reading', 'km', 'miles', 'kms', 'distance', 'run', 'mileage displayed', 'milage', 'milage（km)', 'mileage (km)', 'mileage(km)', 'milage(km)', '里程'],
+  mileage: ['mileage', 'kms driven', 'kilometers', 'odometer', 'odometer reading', 'km', 'miles', 'kms', 'distance', 'run', 'mileage displayed', 'milage', 'milage（km)', 'mileage (km)', 'mileage(km)'],
   owners: ['owners', 'no of owners', 'number of owners', 'previous owners', 'owner count', 'ownership'],
   warranty: ['warranty', 'warranty period', 'warranty status', 'warranty remaining'],
   price: ['price', 'asking price', 'cost', 'amount', 'selling price', 'rate', 'value', 'cif cost', 'exw', 'cif', 'fob', 'cif cost (jebel ali)', 'fob cost', 'unit price'],
+
+  // Additional fields
+  inspectionReport: ['test report', 'inspection report', 'inspection', 'report', 'report url', 'inspection url', 'inspection link'],
+
+  // Serial/Index columns to skip (internal use)
+  _skip: ['no', 'sr. no', 'sr no', 'sr.no', 'serial', 'serial number', 'serial no', 'row', '#', 'id', 'index', 'sno', 's.no'],
 };
 
 // Column names that often contain combined Make+Model data
 const COMBINED_COLUMN_HINTS = [
-  'model', 'vehicle', 'car', 'name', '车型', 'vehicle info'
-];
-
-// Column names that typically contain full description with variant info
-export const FULL_DESCRIPTION_COLUMN_HINTS = [
-  'model name', 'model in', 'full name', 'vehicle name', 'full model', 
-  'description', 'vehicle description', '车型名称', 'material name'
-];
-
-// Column names that typically contain clean Make+Model (no variant)
-export const CLEAN_MAKE_MODEL_HINTS = [
-  'series', '系列', 'make model', 'brand model'
+  'model', 'vehicle', 'car', 'name', '车型', 'vehicle info', 'model name'
 ];
 
 /**
@@ -71,8 +60,8 @@ export const autoDetectMapping = (columns) => {
     let bestScore = 0;
 
     for (const [fieldKey, synonyms] of Object.entries(COLUMN_SYNONYMS)) {
-      // Skip if this field is already mapped
-      if (usedFields.has(fieldKey)) continue;
+      // Skip if this field is already mapped or is internal
+      if (usedFields.has(fieldKey) || fieldKey.startsWith('_')) continue;
 
       for (const syn of synonyms) {
         let score = 0;
@@ -88,6 +77,14 @@ export const autoDetectMapping = (columns) => {
         // Synonym equals first word of column (e.g., "fuel type" matches "fuel")
         else if (syn === normalizedCol.split(' ')[0] && normalizedCol.includes(' ') && syn.length > 2) {
           score = 75;
+        }
+        // Normalized comparison (remove dots, spaces, special chars)
+        else if (syn.replace(/[.\s]/g, '') === normalizedCol.replace(/[.\s]/g, '')) {
+          score = 85;
+        }
+        // Column starts with synonym (e.g., "milage（km)" starts with "milage")
+        else if (normalizedCol.startsWith(syn) && syn.length > 2) {
+          score = 70;
         }
         // Column contains the full synonym (e.g., "total mileage" contains "mileage")
         else if (normalizedCol.includes(syn) && syn.length > 2) {
@@ -146,7 +143,11 @@ export const addSynonym = (fieldKey, synonym) => {
 export const shouldSkipColumn = (columnName) => {
   const normalized = columnName.toLowerCase().trim();
   const skipPatterns = COLUMN_SYNONYMS._skip || [];
-  return skipPatterns.some(pattern => normalized === pattern || normalized.startsWith(pattern + ' '));
+  return skipPatterns.some(pattern => 
+    normalized === pattern || 
+    normalized.startsWith(pattern + ' ') ||
+    normalized.endsWith(' ' + pattern)
+  );
 };
 
 /**

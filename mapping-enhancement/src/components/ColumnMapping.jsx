@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Check, AlertCircle, Info } from 'lucide-react';
+import { Check, AlertCircle, RefreshCw, Info } from 'lucide-react';
 
 // Import sub-components
 import MappingRow from './mapping/MappingRow';
-import SmartSplitSection from './mapping/SmartSplitSection';
+import SmartSplitBanner from './mapping/SmartSplitBanner';
 import SkippedColumns from './mapping/SkippedColumns';
 
 // Import utilities
-import {
-
-  DB_FIELDS,
+import { 
+  DB_FIELDS, 
   getAllFields,
-  analyzeColumns,
+  analyzeColumns, 
   generateInitialMapping,
   validateMapping,
   getUnmappedColumns,
@@ -26,13 +25,13 @@ import { splitMakeModel } from '../utils/smartSplit';
  * Layout: Database fields on LEFT, Excel column dropdowns on RIGHT
  * Sections: Required fields first, then optional, then skipped
  */
-const ColumnMapping = ({
-  columns,
-  mapping,
-  rawData,
-  onMappingChange,
-  onConfirm,
-  onCancel
+const ColumnMapping = ({ 
+  columns, 
+  mapping, 
+  rawData, 
+  onMappingChange, 
+  onConfirm, 
+  onCancel 
 }) => {
   // Analyze columns on mount/change
   const [analysis, setAnalysis] = useState(null);
@@ -44,13 +43,13 @@ const ColumnMapping = ({
     if (columns && columns.length > 0 && rawData && rawData.length > 0) {
       const result = analyzeColumns(columns, rawData);
       setAnalysis(result);
-
+      
       // Apply initial auto-mapping if mapping is empty
       if (Object.keys(mapping).length === 0) {
         const initialMapping = generateInitialMapping(result, columns);
         const autoFields = new Set(Object.values(initialMapping));
         setAutoMappedFields(autoFields);
-
+        
         // Apply each mapping
         Object.entries(initialMapping).forEach(([col, field]) => {
           onMappingChange(col, field);
@@ -69,9 +68,9 @@ const ColumnMapping = ({
   const unmappedColumns = useMemo(() => {
     if (!analysis) return [];
     return getUnmappedColumns(
-      columns,
-      mapping,
-      analysis.skipColumns,
+      columns, 
+      mapping, 
+      analysis.skipColumns, 
       analysis.featureColumns
     );
   }, [columns, mapping, analysis]);
@@ -91,14 +90,14 @@ const ColumnMapping = ({
       if (previousField && previousField !== fieldKey) {
         // This column was mapped elsewhere, clear it first
       }
-
+      
       // Find if this field was mapped to another column
       const previousColumn = fieldToColumn[fieldKey];
       if (previousColumn && previousColumn !== columnName) {
         // Clear the old mapping
         onMappingChange(previousColumn, '');
       }
-
+      
       // Set the new mapping
       onMappingChange(columnName, fieldKey);
     } else {
@@ -110,32 +109,21 @@ const ColumnMapping = ({
     }
   };
 
-  // Handle smart split toggle (checkbox-style)
-  const handleToggleSmartSplit = (columnName, analysis) => {
-    const isCurrentlyApplied = appliedSmartSplits.has(columnName);
-
-    if (isCurrentlyApplied) {
-      // Unchecking - remove the smart split
-      setAppliedSmartSplits(prev => {
-        const next = new Set(prev);
-        next.delete(columnName);
-        return next;
-      });
-      // Clear the mapping for this column
-      onMappingChange(columnName, '');
-    } else {
-      // Checking - apply the smart split
-      setAppliedSmartSplits(prev => new Set([...prev, columnName]));
-
-      // Always use combined_make_model - it extracts all fields
-      onMappingChange(columnName, 'combined_make_model');
-
-      // Clear any existing individual field mappings that would conflict
-      Object.entries(mapping).forEach(([col, field]) => {
-        if (['make', 'model', 'variant', 'year'].includes(field) && col !== columnName) {
-          onMappingChange(col, '');
-        }
-      });
+  // Handle smart split apply
+  const handleApplySmartSplit = (columnName, analysis) => {
+    // Mark this column as having smart split applied
+    setAppliedSmartSplits(prev => new Set([...prev, columnName]));
+    
+    // Map the column to combined_make_model field
+    // The actual splitting happens during transform
+    onMappingChange(columnName, 'combined_make_model');
+    
+    // Auto-fill individual fields if not already mapped
+    if (!fieldToColumn['make']) {
+      // Make will come from smart split
+    }
+    if (!fieldToColumn['model']) {
+      // Model will come from smart split
     }
   };
 
@@ -143,38 +131,46 @@ const ColumnMapping = ({
   const getAvailableColumns = (fieldKey) => {
     const currentColumn = fieldToColumn[fieldKey];
     const mappedColumns = new Set(Object.keys(mapping));
-
+    
     return columns.filter(col => {
       // Always include the currently selected column
       if (col === currentColumn) return true;
       // Include if not mapped and not in skip list
-      if (!mappedColumns.has(col) &&
-        !analysis?.skipColumns.includes(col) &&
-        !analysis?.featureColumns.includes(col)) {
+      if (!mappedColumns.has(col) && 
+          !analysis?.skipColumns.includes(col) && 
+          !analysis?.featureColumns.includes(col)) {
         return true;
       }
       return false;
     });
   };
 
-
+  // Filter smart split candidates that haven't been applied
+  const activeSmartSplitCandidates = useMemo(() => {
+    if (!analysis) return [];
+    return analysis.smartSplitCandidates.filter(
+      c => !appliedSmartSplits.has(c.columnName) && !mapping[c.columnName]
+    );
+  }, [analysis, appliedSmartSplits, mapping]);
 
   // Render a section of fields
   const renderFieldSection = (fields, title, variant = 'default') => (
     <div className="space-y-3">
       <div className="flex items-center gap-2 mb-4">
-        <div className={`w-2 h-2 rounded-full ${variant === 'required' ? 'bg-red-500' : 'bg-gray-400'
-          }`} />
+        <div className={`w-2 h-2 rounded-full ${
+          variant === 'required' ? 'bg-red-500' : 'bg-gray-400'
+        }`} />
         <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
         {variant === 'required' && (
           <span className="text-xs text-gray-500">
-            ({fields.filter(f => fieldToColumn[f.key] || validation.fulfilledBy?.[f.key]).length}/{fields.length} mapped)
+            ({fields.filter(f => fieldToColumn[f.key]).length}/{fields.length} mapped)
           </span>
         )}
       </div>
-
-      <div className={`space-y-2 ${variant === 'required' ? 'p-4 bg-red-50/30 rounded-lg border border-red-100' : ''
-        }`}>
+      
+      <div className={`space-y-2 ${
+        variant === 'required' ? 'p-4 bg-red-50/30 rounded-lg border border-red-100' : ''
+      }`}>
         {fields.map(field => (
           <MappingRow
             key={field.key}
@@ -184,16 +180,14 @@ const ColumnMapping = ({
             isAutoMapped={autoMappedFields.has(field.key)}
             onChange={handleFieldChange}
             smartSplitInfo={
-              analysis?.smartSplitCandidates?.length > 0 &&
-                ['make', 'model', 'year', 'variant'].includes(field.key) &&
-                !appliedSmartSplits.size
-                ? {
-                  shouldSplit: true,
-                  suggestedColumn: analysis.smartSplitCandidates[0]?.columnName
-                }
+              activeSmartSplitCandidates.length > 0 && 
+              ['make', 'model', 'year', 'variant'].includes(field.key)
+                ? { 
+                    shouldSplit: true, 
+                    suggestedColumn: activeSmartSplitCandidates[0]?.columnName 
+                  }
                 : null
             }
-            fulfilledBy={validation.fulfilledBy?.[field.key]}
           />
         ))}
       </div>
@@ -210,7 +204,7 @@ const ColumnMapping = ({
             Select which Excel column contains data for each database field
           </p>
         </div>
-
+        
         {/* Validation status */}
         <div className="flex items-center gap-4">
           {validation.missingRequired.length > 0 ? (
@@ -241,15 +235,16 @@ const ColumnMapping = ({
         </div>
       </div>
 
-      {/* Smart Split Section - Simple checkbox-based selection */}
-      {analysis?.smartSplitCandidates && analysis.smartSplitCandidates.length > 0 && (
-        <SmartSplitSection
-          candidates={analysis.smartSplitCandidates}
-          appliedSplits={appliedSmartSplits}
-          onToggle={handleToggleSmartSplit}
-        />
+      {/* Smart Split Banner */}
+      {activeSmartSplitCandidates.length > 0 && (
+        <div className="mb-6">
+          <SmartSplitBanner
+            detectedColumns={activeSmartSplitCandidates}
+            onApplySplit={handleApplySmartSplit}
+            onDismiss={(col) => setAppliedSmartSplits(prev => new Set([...prev, col]))}
+          />
+        </div>
       )}
-
 
       {/* Main mapping sections */}
       <div className="space-y-8 max-h-[500px] overflow-y-auto pr-2">
@@ -263,16 +258,15 @@ const ColumnMapping = ({
         {renderFieldSection(DB_FIELDS.listingLevel, 'Listing Details')}
 
         {/* Additional Fields */}
-        {DB_FIELDS.additional.length > 0 &&
+        {DB_FIELDS.additional.length > 0 && 
           renderFieldSection(DB_FIELDS.additional, 'Additional Fields')
         }
       </div>
 
-
       {/* Skipped Columns Section */}
       {allSkippedColumns.length > 0 && (
         <div className="mt-6">
-          <SkippedColumns
+          <SkippedColumns 
             columns={allSkippedColumns}
             sampleData={analysis?.sampleData || {}}
           />
@@ -309,7 +303,7 @@ const ColumnMapping = ({
         >
           Cancel
         </button>
-
+        
         <div className="flex items-center gap-3">
           {/* Show missing fields warning */}
           {validation.missingRequired.length > 0 && (
@@ -317,7 +311,7 @@ const ColumnMapping = ({
               Missing: {validation.missingRequired.join(', ')}
             </span>
           )}
-
+          
           <button
             onClick={onConfirm}
             disabled={!validation.isValid}

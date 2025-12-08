@@ -35,27 +35,16 @@ export const STANDARD_FIELDS = {
     { key: 'price', label: 'Price' },
     { key: 'inspectionReport', label: 'Inspection Report' },
   ],
-  // Smart combined fields (will be split automatically)
+  // Smart combined fields (simplified - one option that extracts all)
   combined: [
     {
       key: 'combined_make_model',
-      label: '🔀 Make + Model (Combined)',
-      description: 'Auto-splits "Audi A6" into Make: Audi, Model: A6',
-      splitsTo: ['make', 'model'],
-    },
-    {
-      key: 'combined_make_model_variant',
-      label: '🔀 Make + Model + Variant (Combined)',
-      description: 'Auto-splits "VW Tiguan 330TSI Luxury" into separate fields',
-      splitsTo: ['make', 'model', 'variant'],
-    },
-    {
-      key: 'combined_full_description',
-      label: '🔀 Full Vehicle Description',
-      description: 'Extracts color from description like "...Black Interior - Sky Blue"',
-      splitsTo: ['variant', 'color'],
+      label: '🔀 Split Combined Column',
+      description: 'Automatically extracts Make, Model, Variant, and Year from combined text like "2019 Honda Civic LX"',
+      splitsTo: ['make', 'model', 'variant', 'year'],
     },
   ],
+
   // Edit-only fields (added during edit, not from import)
   editOnly: [
     { key: 'features', label: 'Features', type: 'array' },

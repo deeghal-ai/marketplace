@@ -5,7 +5,7 @@
  * into listings based on matching criteria (make, model, year, color).
  */
 
-import { splitMakeModel, extractColorFromDescription } from './smartSplit';
+import { splitMakeModel, extractColorFromDescription, extractYear } from './smartSplit';
 import { isCombinedField, getCombinedFieldInfo } from '../constants/standardFields';
 
 // Fields used for grouping vehicles into a single listing
@@ -19,7 +19,7 @@ const LISTING_KEYS = [
 ];
 
 // Fields that are vehicle-specific (different for each vehicle)
-const VEHICLE_KEYS = ['vin', 'registrationNumber', 'mileage', 'owners', 'warranty', 'price'];
+const VEHICLE_KEYS = ['vin', 'registrationNumber', 'mileage', 'owners', 'warranty', 'price', 'inspectionReport'];
 
 /**
  * Generate a unique key for grouping vehicles
@@ -72,77 +72,107 @@ export const groupVehiclesIntoListings = (vehicles) => {
   return Object.values(groups);
 };
 
+/**
+ * Process combined fields and split them into individual fields
+ * @param {Object} row - Raw row data
+ * @param {Object} mapping - Column to field mapping
+ * @returns {Object} - Processed row with split fields
+ */
+const processCombinedFields = (row, mapping) => {
+  const processed = {};
+  const filledByCombo = new Set();
 
+  Object.entries(mapping).forEach(([col, field]) => {
+    if (!isCombinedField(field)) return;
+
+    const value = row[col];
+    if (!value) return;
+
+    if (field === 'combined_make_model' || field === 'combined_make_model_variant') {
+      const split = splitMakeModel(String(value));
+
+      if (split.make && !processed.make) {
+        processed.make = split.make;
+        filledByCombo.add('make');
+      }
+      if (split.model && !processed.model) {
+        processed.model = split.model;
+        filledByCombo.add('model');
+      }
+      if (field === 'combined_make_model_variant' && split.variant && !processed.variant) {
+        processed.variant = split.variant;
+        filledByCombo.add('variant');
+      }
+      if (split.year && !processed.year) {
+        processed.year = split.year;
+        filledByCombo.add('year');
+      }
+    }
+
+    if (field === 'combined_full_description') {
+      const color = extractColorFromDescription(String(value));
+      if (color && !processed.color) {
+        processed.color = color;
+        filledByCombo.add('color');
+      }
+      if (!processed.description) {
+        processed.description = String(value);
+        filledByCombo.add('description');
+      }
+      const parts = String(value).split('-').map(s => s.trim());
+      if (parts.length > 0 && !processed.variant) {
+        processed.variant = parts[0];
+        filledByCombo.add('variant');
+      }
+    }
+  });
+
+  return { processed, filledByCombo };
+};
 
 /**
  * Transform raw data using column mapping to standard vehicle format
- * 
- * PRECEDENCE: Direct column mappings take priority over split-extracted fields.
- * Example: If "Brand" column is mapped to "make", it takes precedence over
- * extracting "make" from a combined "MODEL NAME" column.
- * 
  * @param {Object[]} rawData - Raw data from Excel
  * @param {Object} mapping - Column to field mapping
  * @returns {Object[]} - Array of standardized vehicle objects
  */
 export const transformToVehicles = (rawData, mapping) => {
-  // Build reverse mapping for direct (non-combined) field mappings
-  const directMappings = {};
+  const reverseMapping = {};
   Object.entries(mapping).forEach(([col, field]) => {
     if (!isCombinedField(field)) {
-      directMappings[field] = col;
+      reverseMapping[field] = col;
     }
   });
 
   return rawData.map(row => {
     const vehicle = {};
 
-    // STEP 1: Apply DIRECT mappings first (these take precedence)
-    Object.entries(directMappings).forEach(([field, col]) => {
-      const value = row[col];
-      if (value !== undefined && value !== null && value !== '') {
-        vehicle[field] = value;
+    const { processed, filledByCombo } = processCombinedFields(row, mapping);
+    Object.assign(vehicle, processed);
+
+    Object.entries(reverseMapping).forEach(([field, col]) => {
+      if (!filledByCombo.has(field)) {
+        vehicle[field] = row[col];
       }
     });
 
-    // STEP 2: Apply split fields ONLY for fields that weren't directly mapped
-    Object.entries(mapping).forEach(([col, field]) => {
-      if (!isCombinedField(field)) return;
-
-      const value = row[col];
-      if (!value) return;
-
-      if (field === 'combined_make_model') {
-        const split = splitMakeModel(String(value));
-
-        // Only fill in if NOT already set by direct mapping
-        if (split.make && !vehicle.make) {
-          vehicle.make = split.make;
-        }
-        if (split.model && !vehicle.model) {
-          vehicle.model = split.model;
-        }
-        if (split.variant && !vehicle.variant) {
-          vehicle.variant = split.variant;
-        }
-        if (split.year && !vehicle.year) {
-          vehicle.year = split.year;
-        }
-      }
-    });
-
-    // STEP 3: Clean up year - handle various formats including "2021年"
+    // Clean up year - handle various formats including "2021年"
     if (vehicle.year) {
       const yearStr = String(vehicle.year);
-      // Remove Chinese character 年 and extract 4-digit year
-      const cleanYear = yearStr.replace(/年/g, '');
-      const yearMatch = cleanYear.match(/\b(199\d|20[0-3]\d)\b/);
-      if (yearMatch) {
-        vehicle.year = yearMatch[1];
+      // Use extractYear for robust parsing
+      const extractedYear = extractYear(yearStr);
+      if (extractedYear) {
+        vehicle.year = extractedYear;
+      } else {
+        // Fallback: just try to extract any 4-digit year pattern
+        const yearMatch = yearStr.match(/\b(199\d|20[0-3]\d)\b/);
+        if (yearMatch) {
+          vehicle.year = yearMatch[1];
+        }
       }
     }
 
-    // STEP 4: Clean up mileage
+    // Clean up mileage
     if (vehicle.mileage) {
       const mileageStr = String(vehicle.mileage).replace(/[,\s]/g, '');
       const mileageNum = parseFloat(mileageStr);
@@ -151,10 +181,28 @@ export const transformToVehicles = (rawData, mapping) => {
       }
     }
 
+    // Clean up price (remove currency symbols, commas)
+    if (vehicle.price) {
+      const priceStr = String(vehicle.price).replace(/[,\s$€£¥]/g, '');
+      const priceNum = parseFloat(priceStr);
+      if (!isNaN(priceNum)) {
+        vehicle.price = priceNum;
+      }
+    }
+
+    // Normalize color (capitalize first letter)
+    if (vehicle.color && typeof vehicle.color === 'string') {
+      vehicle.color = vehicle.color.charAt(0).toUpperCase() + vehicle.color.slice(1).toLowerCase();
+    }
+
+    // Normalize body type (capitalize first letter)
+    if (vehicle.bodyType && typeof vehicle.bodyType === 'string') {
+      vehicle.bodyType = vehicle.bodyType.charAt(0).toUpperCase() + vehicle.bodyType.slice(1).toLowerCase();
+    }
+
     return vehicle;
   });
 };
-
 
 /**
  * Get summary statistics for listings

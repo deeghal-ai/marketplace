@@ -64,10 +64,33 @@ export const exportToExcel = (data, filename = 'export.xlsx', sheetName = 'Sheet
 };
 
 /**
- * Get sample data for demo/testing
- * @returns {Object[]} - Sample vehicle data
+ * Get sample data for demo/testing (Chinese dealer format with SERIES and MODEL NAME)
+ * This matches the format: No, VIN, MODEL NAME, SERIES, Body Type, Year, Brand, Color, Mileage, Price
+ * @returns {Object[]} - Sample vehicle data matching Chinese dealer format
  */
 export const getSampleData = () => [
+  // Honda Crider vehicles (like user's data)
+  { 'No': 1, 'VIN': 'LHGFS1635M2039517', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'White', 'Mileage(km)': 202700, 'CIF Cost (Jebel Ali)': '$6,530' },
+  { 'No': 2, 'VIN': 'LHGFS1634M2042943', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'White', 'Mileage(km)': 121254, 'CIF Cost (Jebel Ali)': '$6,530' },
+  { 'No': 3, 'VIN': 'LHGFS1634M2039492', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'White', 'Mileage(km)': 185213, 'CIF Cost (Jebel Ali)': '$6,640' },
+  { 'No': 4, 'VIN': 'LHGFS1633M2039516', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'White', 'Mileage(km)': 199719, 'CIF Cost (Jebel Ali)': '$6,640' },
+  // Nissan Sylphy vehicles 
+  { 'No': 5, 'VIN': 'LGBH52E0XMY173095', 'MODEL NAME': '2022 NISSAN SYLPHY 1.6XE CVT Key Account Version', 'SERIES': 'SYLPHY', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'NISSAN', 'Ext.Color': 'White', 'Mileage(km)': 180666, 'CIF Cost (Jebel Ali)': '$6,870' },
+  { 'No': 6, 'VIN': 'LGBH52E0XMY173081', 'MODEL NAME': '2022 NISSAN SYLPHY 1.6XE CVT Key Account Version', 'SERIES': 'SYLPHY', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'NISSAN', 'Ext.Color': 'White', 'Mileage(km)': 178680, 'CIF Cost (Jebel Ali)': '$6,980' },
+  { 'No': 7, 'VIN': 'LGBH52E0XMY108537', 'MODEL NAME': '2022 NISSAN SYLPHY Classic 1.6XE CVT', 'SERIES': 'SYLPHY', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'NISSAN', 'Ext.Color': 'White', 'Mileage(km)': 143069, 'CIF Cost (Jebel Ali)': '$7,090' },
+  { 'No': 8, 'VIN': 'LGBH52E02MY093239', 'MODEL NAME': '2022 NISSAN SYLPHY Classic 1.6XE CVT', 'SERIES': 'SYLPHY', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'NISSAN', 'Ext.Color': 'White', 'Mileage(km)': 150655, 'CIF Cost (Jebel Ali)': '$7,090' },
+  // More Honda Crider with different mileage
+  { 'No': 9, 'VIN': 'LHGFS1638M2036403', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'White', 'Mileage(km)': 133867, 'CIF Cost (Jebel Ali)': '$6,980' },
+  { 'No': 10, 'VIN': 'LHGFS1638M2038846', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'White', 'Mileage(km)': 146536, 'CIF Cost (Jebel Ali)': '$6,980' },
+  { 'No': 11, 'VIN': 'LHGFS163XM2040744', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'Silver', 'Mileage(km)': 143876, 'CIF Cost (Jebel Ali)': '$6,980' },
+  { 'No': 12, 'VIN': 'LHGFS1632M2040804', 'MODEL NAME': '2019 GAC Honda Crider 180Turbo CVT Comfort China VI', 'SERIES': 'HONDA Crider', 'Body Type': 'sedan', 'Year': '2021', 'Brand': 'HONDA', 'Ext.Color': 'Silver', 'Mileage(km)': 139327, 'CIF Cost (Jebel Ali)': '$6,980' },
+];
+
+/**
+ * Get simple sample data for demo/testing (original format)
+ * @returns {Object[]} - Sample vehicle data
+ */
+export const getSimpleSampleData = () => [
   { Brand: 'Toyota', Model: 'Camry', Year: 2023, Color: 'Silver', Variant: 'XLE', 'Body Type': 'Sedan', 'Fuel Type': 'Petrol', Transmission: 'Automatic', VIN: 'ABC123456789', Mileage: 15000, 'No of Owners': 1, Price: 95000 },
   { Brand: 'Toyota', Model: 'Camry', Year: 2023, Color: 'Silver', Variant: 'XLE', 'Body Type': 'Sedan', 'Fuel Type': 'Petrol', Transmission: 'Automatic', VIN: 'DEF123456789', Mileage: 18000, 'No of Owners': 1, Price: 92000 },
   { Brand: 'Toyota', Model: 'Camry', Year: 2023, Color: 'Silver', Variant: 'XLE', 'Body Type': 'Sedan', 'Fuel Type': 'Petrol', Transmission: 'Automatic', VIN: 'GHI123456789', Mileage: 12000, 'No of Owners': 2, Price: 98000 },
