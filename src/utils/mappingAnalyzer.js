@@ -20,17 +20,19 @@ export const DB_FIELDS = {
     { key: 'year', label: 'Year', required: true, description: 'Manufacturing year' },
     { key: 'color', label: 'Color', required: true, description: 'Exterior color' },
   ],
-  
+
   // Vehicle-specific fields (important for individual vehicles)
   vehicleSpecific: [
     { key: 'vin', label: 'VIN', required: false, description: 'Vehicle Identification Number' },
     { key: 'registrationNumber', label: 'Registration Number', required: false },
     { key: 'mileage', label: 'Mileage', required: false, description: 'Odometer reading' },
     { key: 'price', label: 'Price', required: false, description: 'Selling price' },
+    { key: 'incoterm', label: 'Incoterm', required: false, description: 'International Commercial Terms' },
+    { key: 'inspectionReportLink', label: 'Inspection Report Link', required: false, description: 'URL to vehicle inspection report' },
     { key: 'owners', label: 'Number of Owners', required: false },
     { key: 'warranty', label: 'Warranty', required: false },
   ],
-  
+
   // Listing-level fields (shared across grouped vehicles)
   listingLevel: [
     { key: 'variant', label: 'Variant / Trim', required: false, description: 'Trim level, version, or variant' },
@@ -49,12 +51,10 @@ export const DB_FIELDS = {
     { key: 'country', label: 'Country', required: false },
     { key: 'description', label: 'Description', required: false },
   ],
-  
+
   // Additional fields
-  additional: [
-    { key: 'inspectionReport', label: 'Inspection Report URL', required: false },
-  ],
-  
+  additional: [],
+
   // Virtual/Combined fields (not shown directly, used for smart split)
   combined: [
     { key: 'combined_make_model', label: 'Combined Make+Model', virtual: true, fulfills: ['make', 'model'] },
@@ -78,7 +78,7 @@ export const getAllFields = () => [
  * Get required field keys
  * @returns {string[]} - Array of required field keys
  */
-export const getRequiredFieldKeys = () => 
+export const getRequiredFieldKeys = () =>
   DB_FIELDS.required.filter(f => f.required).map(f => f.key);
 
 /**
@@ -259,7 +259,7 @@ const validateFieldMatch = (fieldKey, samples) => {
         return commonMakes.some(make => sample.toLowerCase().includes(make.toLowerCase()));
       }).length;
       break;
-      
+
     case 'year':
       // Check if samples look like years (4-digit numbers)
       matches = sampleStrings.filter(sample => {
@@ -267,21 +267,21 @@ const validateFieldMatch = (fieldKey, samples) => {
         return /\b(199\d|20[0-3]\d)\b/.test(cleanSample);
       }).length;
       break;
-      
+
     case 'price':
       // Check if samples look like prices (numbers)
       matches = sampleStrings.filter(sample => {
         return /\d/.test(sample) && !/^[a-zA-Z\s]+$/.test(sample);
       }).length;
       break;
-      
+
     case 'mileage':
       // Check if samples look like mileage (numbers)
       matches = sampleStrings.filter(sample => {
         return /\d/.test(sample) && !/^[a-zA-Z\s]+$/.test(sample);
       }).length;
       break;
-      
+
     case 'color':
       // Check if samples look like colors
       const commonColors = ['white', 'black', 'silver', 'gray', 'red', 'blue', 'green'];
@@ -289,7 +289,7 @@ const validateFieldMatch = (fieldKey, samples) => {
         return commonColors.some(color => sample.toLowerCase().includes(color));
       }).length;
       break;
-      
+
     default:
       // For other fields, assume the column name matching is sufficient
       return 1.0;
@@ -308,7 +308,7 @@ export const generateInitialMapping = (analysis, columns) => {
   const mapping = {};
   const usedFields = new Set();
   const usedColumns = new Set([
-    ...analysis.skipColumns, 
+    ...analysis.skipColumns,
     ...analysis.featureColumns
   ]);
 
@@ -318,7 +318,7 @@ export const generateInitialMapping = (analysis, columns) => {
     if (rec.suggestedMapping && !usedColumns.has(rec.columnName)) {
       mapping[rec.columnName] = rec.suggestedMapping;
       usedColumns.add(rec.columnName);
-      
+
       // If this is a combined field, mark the individual fields as "will be filled"
       if (rec.suggestedMapping === 'combined_make_model') {
         usedFields.add('make');
@@ -337,11 +337,11 @@ export const generateInitialMapping = (analysis, columns) => {
   for (const [col, field] of Object.entries(analysis.mappingSuggestions)) {
     if (!usedFields.has(field) && !usedColumns.has(col)) {
       // Skip if there's a high-priority recommendation against using this mapping
-      const hasConflictingRec = analysis.recommendations.some(r => 
-        r.priority === 'high' && 
+      const hasConflictingRec = analysis.recommendations.some(r =>
+        r.priority === 'high' &&
         (r.columnName === col || (r.type === 'avoid_smart_split' && col === r.columnName))
       );
-      
+
       if (!hasConflictingRec) {
         mapping[col] = field;
         usedFields.add(field);
@@ -362,7 +362,7 @@ export const validateMapping = (mapping) => {
   const mappedFields = new Set(Object.values(mapping));
   const requiredFields = getRequiredFieldKeys();
   const fulfilledBy = {};
-  
+
   // Check for combined fields that fulfill individual requirements
   Object.entries(mapping).forEach(([col, field]) => {
     if (field === 'combined_make_model') {
@@ -417,8 +417,8 @@ export const validateMapping = (mapping) => {
 export const getUnmappedColumns = (allColumns, mapping, skipColumns = [], featureColumns = []) => {
   const mappedColumns = new Set(Object.keys(mapping));
   const excludedColumns = new Set([...skipColumns, ...featureColumns]);
-  
-  return allColumns.filter(col => 
+
+  return allColumns.filter(col =>
     !mappedColumns.has(col) && !excludedColumns.has(col)
   );
 };
@@ -439,7 +439,7 @@ const assessDataQuality = (samples) => {
   // Check for consistency
   const uniqueValues = new Set(samples.map(String));
   const duplicateRatio = (samples.length - uniqueValues.size) / samples.length;
-  
+
   if (duplicateRatio > 0.8) {
     issues.push('Very repetitive data');
     score -= 30;
@@ -463,7 +463,7 @@ const assessDataQuality = (samples) => {
     const str = String(s);
     return str.includes('  ') || /[(),\-\/]/.test(str);
   });
-  
+
   if (hasComplexData) {
     issues.push('Contains complex combined data');
     score -= 20;
@@ -487,29 +487,29 @@ const assessDataQuality = (samples) => {
 const analyzeCrossColumnRelationships = (columnAnalysis, columns) => {
   const relationships = {};
   const recommendations = [];
-  
+
   // Collect columns by their smart split data type
   const cleanMakeModelColumns = [];
   const fullDescriptionColumns = [];
 
   Object.entries(columnAnalysis).forEach(([col, analysis]) => {
     const smartAnalysis = analysis.smartSplitAnalysis;
-    
+
     // Only consider columns that are actually splittable (have multiple words)
     if (!smartAnalysis?.shouldSplit) return;
-    
+
     const dataType = smartAnalysis.dataType;
     const avgWords = smartAnalysis.avgWordCount || 0;
-    
+
     // Clean make+model: exactly 2 words like "HONDA Crider"
     if (dataType === 'clean_make_model' && avgWords >= 1.5 && avgWords <= 2.5) {
       cleanMakeModelColumns.push({ column: col, analysis: smartAnalysis });
-      
+
       relationships[col] = {
         type: 'clean_make_model',
         description: 'Contains clean Make + Model data',
       };
-      
+
       recommendations.push({
         type: 'prefer_clean_source',
         columnName: col,
@@ -518,17 +518,17 @@ const analyzeCrossColumnRelationships = (columnAnalysis, columns) => {
         priority: 'high',
       });
     }
-    
+
     // Full description: 3+ words with variant info
     if ((dataType === 'full_description' || smartAnalysis.hasVariant) && avgWords > 2.5) {
       fullDescriptionColumns.push({ column: col, analysis: smartAnalysis });
-      
+
       relationships[col] = {
         type: 'full_description_with_variant',
         description: 'Contains Make + Model + Variant data',
         variantConfidence: smartAnalysis.variantConfidence,
       };
-      
+
       recommendations.push({
         type: 'extract_variant_source',
         columnName: col,
@@ -545,7 +545,7 @@ const analyzeCrossColumnRelationships = (columnAnalysis, columns) => {
   if (cleanMakeModelColumns.length > 0 && fullDescriptionColumns.length > 0) {
     const bestClean = cleanMakeModelColumns[0];
     const bestFull = fullDescriptionColumns[0];
-    
+
     if (bestClean.column !== bestFull.column) {
       // Add optimal combination as first recommendation
       recommendations.unshift({

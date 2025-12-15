@@ -31,6 +31,8 @@ export const COLUMN_SYNONYMS = {
   owners: ['owners', 'no of owners', 'number of owners', 'previous owners', 'owner count', 'ownership'],
   warranty: ['warranty', 'warranty period', 'warranty status', 'warranty remaining'],
   price: ['price', 'asking price', 'cost', 'amount', 'selling price', 'rate', 'value', 'cif cost', 'exw', 'cif', 'fob', 'cif cost (jebel ali)', 'fob cost', 'unit price'],
+  incoterm: ['incoterm', 'incoterms', 'trade terms', 'delivery terms', 'shipping terms', 'terms of delivery'],
+  inspectionReportLink: ['inspection report link', 'inspection link', 'inspection url', 'report link', 'report url', 'test report link', 'test report url'],
 
   // Additional fields
   inspectionReport: ['test report', 'inspection report', 'inspection', 'report', 'report url', 'inspection url', 'inspection link'],
@@ -143,8 +145,8 @@ export const addSynonym = (fieldKey, synonym) => {
 export const shouldSkipColumn = (columnName) => {
   const normalized = columnName.toLowerCase().trim();
   const skipPatterns = COLUMN_SYNONYMS._skip || [];
-  return skipPatterns.some(pattern => 
-    normalized === pattern || 
+  return skipPatterns.some(pattern =>
+    normalized === pattern ||
     normalized.startsWith(pattern + ' ') ||
     normalized.endsWith(' ' + pattern)
   );
@@ -157,7 +159,7 @@ export const shouldSkipColumn = (columnName) => {
  */
 export const isFeatureColumn = (columnName) => {
   const normalized = columnName.toLowerCase().trim();
-  return /^feature\s*\d*$/i.test(normalized) || 
-         /^option\s*\d*$/i.test(normalized) ||
-         /^equipment\s*\d*$/i.test(normalized);
+  return /^feature\s*\d*$/i.test(normalized) ||
+    /^option\s*\d*$/i.test(normalized) ||
+    /^equipment\s*\d*$/i.test(normalized);
 };

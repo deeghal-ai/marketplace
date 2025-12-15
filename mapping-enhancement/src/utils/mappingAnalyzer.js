@@ -20,17 +20,19 @@ export const DB_FIELDS = {
     { key: 'year', label: 'Year', required: true, description: 'Manufacturing year' },
     { key: 'color', label: 'Color', required: true, description: 'Exterior color' },
   ],
-  
+
   // Vehicle-specific fields (important for individual vehicles)
   vehicleSpecific: [
     { key: 'vin', label: 'VIN', required: false, description: 'Vehicle Identification Number' },
     { key: 'registrationNumber', label: 'Registration Number', required: false },
     { key: 'mileage', label: 'Mileage', required: false, description: 'Odometer reading' },
     { key: 'price', label: 'Price', required: false, description: 'Selling price' },
+    { key: 'incoterm', label: 'Incoterm', required: false, description: 'International Commercial Terms' },
+    { key: 'inspectionReportLink', label: 'Inspection Report Link', required: false, description: 'URL to vehicle inspection report' },
     { key: 'owners', label: 'Number of Owners', required: false },
     { key: 'warranty', label: 'Warranty', required: false },
   ],
-  
+
   // Listing-level fields (shared across grouped vehicles)
   listingLevel: [
     { key: 'variant', label: 'Variant / Trim', required: false },
@@ -49,7 +51,7 @@ export const DB_FIELDS = {
     { key: 'country', label: 'Country', required: false },
     { key: 'description', label: 'Description', required: false },
   ],
-  
+
   // Additional fields
   additional: [
     { key: 'inspectionReport', label: 'Inspection Report URL', required: false },
@@ -71,7 +73,7 @@ export const getAllFields = () => [
  * Get required field keys
  * @returns {string[]} - Array of required field keys
  */
-export const getRequiredFieldKeys = () => 
+export const getRequiredFieldKeys = () =>
   DB_FIELDS.required.filter(f => f.required).map(f => f.key);
 
 /**
@@ -192,7 +194,7 @@ export const generateInitialMapping = (analysis, columns) => {
   const mapping = {};
   const usedFields = new Set();
   const usedColumns = new Set([
-    ...analysis.skipColumns, 
+    ...analysis.skipColumns,
     ...analysis.featureColumns
   ]);
 
@@ -216,7 +218,7 @@ export const generateInitialMapping = (analysis, columns) => {
 export const validateMapping = (mapping) => {
   const mappedFields = new Set(Object.values(mapping));
   const requiredFields = getRequiredFieldKeys();
-  
+
   const missingRequired = requiredFields.filter(f => !mappedFields.has(f));
   const warnings = [];
 
@@ -247,8 +249,8 @@ export const validateMapping = (mapping) => {
 export const getUnmappedColumns = (allColumns, mapping, skipColumns = [], featureColumns = []) => {
   const mappedColumns = new Set(Object.keys(mapping));
   const excludedColumns = new Set([...skipColumns, ...featureColumns]);
-  
-  return allColumns.filter(col => 
+
+  return allColumns.filter(col =>
     !mappedColumns.has(col) && !excludedColumns.has(col)
   );
 };
