@@ -38,6 +38,7 @@ const ColumnMapping = ({
   const [analysis, setAnalysis] = useState(null);
   const [appliedSmartSplits, setAppliedSmartSplits] = useState(new Set());
   const [autoMappedFields, setAutoMappedFields] = useState(new Set());
+  const [defaultIncoterm, setDefaultIncoterm] = useState(null);
 
   // Run analysis when columns or data changes
   useEffect(() => {
@@ -64,6 +65,9 @@ const ColumnMapping = ({
 
   // Validation
   const validation = useMemo(() => validateMapping(mapping), [mapping]);
+
+  // Check if incoterm is valid (either mapped to column OR has default selected)
+  const isIncotermValid = fieldToColumn['incoterm'] || defaultIncoterm;
 
   // Get unmapped columns for the skipped section
   const unmappedColumns = useMemo(() => {
@@ -159,6 +163,9 @@ const ColumnMapping = ({
 
 
 
+  // Check if incoterm is mapped to a column
+  const isIncotermMapped = fieldToColumn['incoterm'];
+
   // Render a section of fields
   const renderFieldSection = (fields, title, variant = 'default') => (
     <div className="space-y-3">
@@ -176,25 +183,57 @@ const ColumnMapping = ({
       <div className={`space-y-2 ${variant === 'required' ? 'p-4 bg-red-50/30 rounded-lg border border-red-100' : ''
         }`}>
         {fields.map(field => (
-          <MappingRow
-            key={field.key}
-            field={field}
-            selectedColumn={fieldToColumn[field.key] || ''}
-            availableColumns={getAvailableColumns(field.key)}
-            isAutoMapped={autoMappedFields.has(field.key)}
-            onChange={handleFieldChange}
-            smartSplitInfo={
-              analysis?.smartSplitCandidates?.length > 0 &&
-                ['make', 'model', 'year', 'variant'].includes(field.key) &&
-                !appliedSmartSplits.size
-                ? {
-                  shouldSplit: true,
-                  suggestedColumn: analysis.smartSplitCandidates[0]?.columnName
-                }
-                : null
-            }
-            fulfilledBy={validation.fulfilledBy?.[field.key]}
-          />
+          <div key={field.key}>
+            <MappingRow
+              field={field}
+              selectedColumn={fieldToColumn[field.key] || ''}
+              availableColumns={getAvailableColumns(field.key)}
+              isAutoMapped={autoMappedFields.has(field.key)}
+              onChange={handleFieldChange}
+              smartSplitInfo={
+                analysis?.smartSplitCandidates?.length > 0 &&
+                  ['make', 'model', 'year', 'variant'].includes(field.key) &&
+                  !appliedSmartSplits.size
+                  ? {
+                    shouldSplit: true,
+                    suggestedColumn: analysis.smartSplitCandidates[0]?.columnName
+                  }
+                  : null
+              }
+              fulfilledBy={validation.fulfilledBy?.[field.key]}
+            />
+            {/* Show FOB/CIF toggle when incoterm is not mapped */}
+            {field.key === 'incoterm' && !isIncotermMapped && (
+              <div className="ml-[180px] mt-2 flex items-center gap-2">
+                <span className="text-xs text-gray-500">or select default:</span>
+                <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setDefaultIncoterm('FOB')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${defaultIncoterm === 'FOB'
+                      ? 'bg-navy text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                  >
+                    FOB
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDefaultIncoterm('CIF')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 ${defaultIncoterm === 'CIF'
+                      ? 'bg-navy text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                  >
+                    CIF
+                  </button>
+                </div>
+                {defaultIncoterm && (
+                  <span className="text-xs text-green-600">✓ {defaultIncoterm} will apply to all</span>
+                )}
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>
@@ -317,10 +356,16 @@ const ColumnMapping = ({
               Missing: {validation.missingRequired.join(', ')}
             </span>
           )}
+          {/* Show incoterm warning */}
+          {validation.isValid && !isIncotermValid && (
+            <span className="text-sm text-amber-600">
+              Please select Incoterm column or default
+            </span>
+          )}
 
           <button
-            onClick={onConfirm}
-            disabled={!validation.isValid}
+            onClick={() => onConfirm({ defaultIncoterm })}
+            disabled={!validation.isValid || !isIncotermValid}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Check className="w-4 h-4" />

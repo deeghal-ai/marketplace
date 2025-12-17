@@ -94,8 +94,8 @@ function App() {
   };
 
   // Confirm mapping and import
-  const handleConfirmMapping = () => {
-    importVehicles(rawData, mapping);
+  const handleConfirmMapping = (options = {}) => {
+    importVehicles(rawData, mapping, options);
     setStep('listings');
   };
 

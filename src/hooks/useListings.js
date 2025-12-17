@@ -12,8 +12,8 @@ export const useListings = () => {
   const [filters, setFilters] = useState({});
 
   // Import vehicles and create listings
-  const importVehicles = useCallback((rawData, mapping) => {
-    const vehicles = transformToVehicles(rawData, mapping);
+  const importVehicles = useCallback((rawData, mapping, options = {}) => {
+    const vehicles = transformToVehicles(rawData, mapping, options);
     const groupedListings = groupVehiclesIntoListings(vehicles);
     setListings(groupedListings);
     setSelectedIds([]);
@@ -71,9 +71,9 @@ export const useListings = () => {
   }, []);
 
   const toggleSelection = useCallback((id) => {
-    setSelectedIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(i => i !== id) 
+    setSelectedIds(prev =>
+      prev.includes(id)
+        ? prev.filter(i => i !== id)
         : [...prev, id]
     );
   }, []);
@@ -85,7 +85,7 @@ export const useListings = () => {
   // Update a single listing
   const updateListing = useCallback((updatedListing) => {
     setListings(prev => {
-      const updated = prev.map(l => 
+      const updated = prev.map(l =>
         l.id === updatedListing.id ? updatedListing : l
       );
       saveListings(updated);
@@ -138,7 +138,7 @@ export const useListings = () => {
     filters,
     filterOptions,
     stats,
-    
+
     // Actions
     importVehicles,
     loadFromStorage,

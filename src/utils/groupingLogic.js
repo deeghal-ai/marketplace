@@ -19,7 +19,7 @@ const LISTING_KEYS = [
 ];
 
 // Fields that are vehicle-specific (different for each vehicle)
-const VEHICLE_KEYS = ['vin', 'registrationNumber', 'mileage', 'owners', 'warranty', 'price'];
+const VEHICLE_KEYS = ['vin', 'registrationNumber', 'mileage', 'owners', 'warranty', 'price', 'incoterm', 'inspectionReportLink'];
 
 /**
  * Generate a unique key for grouping vehicles
@@ -85,7 +85,8 @@ export const groupVehiclesIntoListings = (vehicles) => {
  * @param {Object} mapping - Column to field mapping
  * @returns {Object[]} - Array of standardized vehicle objects
  */
-export const transformToVehicles = (rawData, mapping) => {
+export const transformToVehicles = (rawData, mapping, options = {}) => {
+  const { defaultIncoterm } = options;
   // Build reverse mapping for direct (non-combined) field mappings
   const directMappings = {};
   Object.entries(mapping).forEach(([col, field]) => {
@@ -149,6 +150,11 @@ export const transformToVehicles = (rawData, mapping) => {
       if (!isNaN(mileageNum)) {
         vehicle.mileage = mileageNum < 500 ? mileageNum * 1000 : mileageNum;
       }
+    }
+
+    // STEP 5: Apply default incoterm if not mapped from column
+    if (!vehicle.incoterm && defaultIncoterm) {
+      vehicle.incoterm = defaultIncoterm;
     }
 
     return vehicle;
